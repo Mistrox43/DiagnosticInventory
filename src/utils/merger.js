@@ -114,16 +114,18 @@ export const mergeFiles = (parsedFiles) => {
 /**
  * Remove duplicate rows based on Site ID (col 1)
  * @param {Object} mergedData - Merged data by sheet
- * @returns {Object} - Deduplicated data
+ * @returns {Object} - { data: deduplicated data, duplicates: info about duplicates }
  */
 export const deduplicateData = (mergedData) => {
   const deduplicated = {};
+  const duplicateInfo = {};
   const sheetNames = ['Site Information', 'CT Capabilities', 'MRI Capabilities'];
 
   sheetNames.forEach(sheetName => {
     const data = mergedData[sheetName];
     if (!data || !data.allRows) {
       deduplicated[sheetName] = data;
+      duplicateInfo[sheetName] = { duplicateCount: 0, duplicateSiteIds: [] };
       return;
     }
 
@@ -133,6 +135,8 @@ export const deduplicateData = (mergedData) => {
 
     const seen = new Set();
     const uniqueRows = [];
+    const duplicateSiteIds = [];
+    let duplicateCount = 0;
 
     dataRows.forEach(row => {
       const siteId = row[1]; // Site ID is at column 1
@@ -141,6 +145,11 @@ export const deduplicateData = (mergedData) => {
         if (!seen.has(key)) {
           seen.add(key);
           uniqueRows.push(row);
+        } else {
+          duplicateCount++;
+          if (!duplicateSiteIds.includes(key)) {
+            duplicateSiteIds.push(key);
+          }
         }
       } else {
         // Keep rows without Site ID (validation will catch this)
@@ -151,9 +160,14 @@ export const deduplicateData = (mergedData) => {
     deduplicated[sheetName] = {
       allRows: headers.concat(uniqueRows)
     };
+
+    duplicateInfo[sheetName] = {
+      duplicateCount,
+      duplicateSiteIds
+    };
   });
 
-  return deduplicated;
+  return { data: deduplicated, duplicates: duplicateInfo };
 };
 
 /**

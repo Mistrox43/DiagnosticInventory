@@ -74,6 +74,9 @@ const validateSheet = (fileName, sheetName, sheetData, extraColumns, allFiles) =
     return issues;
   }
 
+  // Track Site IDs to detect duplicates within this file
+  const siteIdTracker = new Map(); // Map<siteId, firstRowNumber>
+
   // Validate each row
   data.forEach((rowObj) => {
     const { rowData, excelRow } = rowObj;
@@ -86,6 +89,23 @@ const validateSheet = (fileName, sheetName, sheetData, extraColumns, allFiles) =
     const siteId = rowData[1];
     if (!siteId || String(siteId).trim() === '') {
       return; // Skip rows without Site ID
+    }
+
+    // Check for duplicate Site ID within this file
+    const siteIdKey = String(siteId).trim();
+    if (siteIdTracker.has(siteIdKey)) {
+      const firstRow = siteIdTracker.get(siteIdKey);
+      issues.push({
+        file: fileName,
+        sheet: sheetName,
+        row: excelRow,
+        column: getColumnLetter(1),
+        field: 'Site ID*',
+        severity: 'warning',
+        message: `Duplicate Site ID "${siteIdKey}" found in this file (first occurrence at row ${firstRow})`
+      });
+    } else {
+      siteIdTracker.set(siteIdKey, excelRow);
     }
 
     // Validate each field in the schema
@@ -118,7 +138,7 @@ const validateSheet = (fileName, sheetName, sheetData, extraColumns, allFiles) =
           sheet: sheetName,
           row: excelRow,
           column: getColumnLetter(8),
-          field: 'Sub-region',
+          field: 'Sub-region*',
           severity: 'error',
           message: subResult.message
         });
@@ -130,6 +150,53 @@ const validateSheet = (fileName, sheetName, sheetData, extraColumns, allFiles) =
 };
 
 /**
+ * Check for duplicate Site IDs across all files
+ * @param {Array<Object>} parsedFiles - Array of parsed files
+ * @returns {Object} - Map of duplicate Site IDs per sheet with file locations
+ */
+const checkCrossFileDuplicates = (parsedFiles) => {
+  const sheetNames = ['Site Information', 'CT Capabilities', 'MRI Capabilities'];
+  const duplicates = {};
+
+  sheetNames.forEach(sheetName => {
+    // Track Site IDs across all files: Map<siteId, Array<{fileName, row}>>
+    const siteIdLocations = new Map();
+
+    parsedFiles.forEach(file => {
+      const sheetData = file.sheets[sheetName];
+      if (!sheetData || !sheetData.data) return;
+
+      sheetData.data.forEach(rowObj => {
+        const { rowData, excelRow } = rowObj;
+        const siteId = rowData[1];
+
+        if (!siteId || String(siteId).trim() === '') return;
+
+        const siteIdKey = String(siteId).trim();
+        if (!siteIdLocations.has(siteIdKey)) {
+          siteIdLocations.set(siteIdKey, []);
+        }
+
+        siteIdLocations.get(siteIdKey).push({
+          fileName: file.fileName,
+          row: excelRow
+        });
+      });
+    });
+
+    // Find Site IDs that appear in multiple locations
+    duplicates[sheetName] = new Map();
+    siteIdLocations.forEach((locations, siteId) => {
+      if (locations.length > 1) {
+        duplicates[sheetName].set(siteId, locations);
+      }
+    });
+  });
+
+  return duplicates;
+};
+
+/**
  * Validate all files together (for cross-file validation)
  * @param {Array<Object>} parsedFiles - Array of parsed files
  * @returns {Object} - Validation results for each file
@@ -137,8 +204,55 @@ const validateSheet = (fileName, sheetName, sheetData, extraColumns, allFiles) =
 export const validateAllFiles = (parsedFiles) => {
   const results = {};
 
+  // First, run individual file validations
   parsedFiles.forEach(file => {
     results[file.fileName] = validateFile(file, parsedFiles);
+  });
+
+  // Check for duplicate Site IDs across files
+  const crossFileDuplicates = checkCrossFileDuplicates(parsedFiles);
+
+  // Add warnings for cross-file duplicates
+  parsedFiles.forEach(file => {
+    const sheetNames = ['Site Information', 'CT Capabilities', 'MRI Capabilities'];
+
+    sheetNames.forEach(sheetName => {
+      const sheetData = file.sheets[sheetName];
+      if (!sheetData || !sheetData.data) return;
+
+      const duplicatesInSheet = crossFileDuplicates[sheetName];
+      if (!duplicatesInSheet || duplicatesInSheet.size === 0) return;
+
+      sheetData.data.forEach(rowObj => {
+        const { rowData, excelRow } = rowObj;
+        const siteId = rowData[1];
+
+        if (!siteId || String(siteId).trim() === '') return;
+
+        const siteIdKey = String(siteId).trim();
+        const locations = duplicatesInSheet.get(siteIdKey);
+
+        if (locations && locations.length > 1) {
+          // This Site ID appears in multiple places
+          const otherLocations = locations
+            .filter(loc => !(loc.fileName === file.fileName && loc.row === excelRow))
+            .map(loc => `${loc.fileName} (row ${loc.row})`)
+            .join(', ');
+
+          if (otherLocations) {
+            results[file.fileName].push({
+              file: file.fileName,
+              sheet: sheetName,
+              row: excelRow,
+              column: getColumnLetter(1),
+              field: 'Site ID*',
+              severity: 'warning',
+              message: `Site ID "${siteIdKey}" appears in multiple files. Also found in: ${otherLocations}`
+            });
+          }
+        }
+      });
+    });
   });
 
   return results;

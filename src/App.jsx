@@ -79,7 +79,9 @@ function App() {
       const merged = mergeFiles(parsedFiles);
 
       // Deduplicate based on Site ID
-      const deduplicated = deduplicateData(merged);
+      const deduplicationResult = deduplicateData(merged);
+      const deduplicated = deduplicationResult.data;
+      const duplicates = deduplicationResult.duplicates;
 
       // Get merge statistics
       const stats = getMergeStats(parsedFiles, deduplicated);
@@ -97,6 +99,21 @@ function App() {
       Object.entries(stats.totalRows).forEach(([tab, count]) => {
         message += `- ${tab}: ${count} rows\n`;
       });
+
+      // Show duplicate information if any were found
+      const totalDuplicates = Object.values(duplicates).reduce((sum, info) => sum + info.duplicateCount, 0);
+      if (totalDuplicates > 0) {
+        message += `\n⚠️ Duplicates removed during merge:\n`;
+        Object.entries(duplicates).forEach(([tab, info]) => {
+          if (info.duplicateCount > 0) {
+            message += `- ${tab}: ${info.duplicateCount} duplicate row(s) removed\n`;
+            if (info.duplicateSiteIds.length > 0) {
+              message += `  Site IDs: ${info.duplicateSiteIds.join(', ')}\n`;
+            }
+          }
+        });
+        message += `\nNote: First occurrence of each Site ID was kept.\n`;
+      }
 
       if (Object.values(stats.customColumns).some(cols => cols.length > 0)) {
         message += `\nCustom columns included:\n`;
