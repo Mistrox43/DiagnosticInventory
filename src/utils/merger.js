@@ -42,8 +42,8 @@ export const mergeFiles = (parsedFiles) => {
       const data = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
       const schema = TEMPLATE_SCHEMA[sheetName];
 
-      // Copy header rows (rows 0 to dataStartRow-1)
-      mergedData[sheetName].headers = data.slice(0, schema.dataStartRow);
+      // Copy only the header row (row 3, index 2)
+      mergedData[sheetName].headers = [data[schema.headerRow]];
 
       // Get extra column names
       const extraColNames = Object.keys(allExtraCols[sheetName]);
@@ -51,9 +51,9 @@ export const mergeFiles = (parsedFiles) => {
 
       // Add extra column headers to the header row
       if (mergedData[sheetName].headers.length > 0 && extraColNames.length > 0) {
-        const lastHeaderRow = mergedData[sheetName].headers[schema.headerRow];
+        const headerRow = mergedData[sheetName].headers[0];
         extraColNames.forEach(colName => {
-          lastHeaderRow.push(colName);
+          headerRow.push(colName);
         });
       }
     }
@@ -127,9 +127,9 @@ export const deduplicateData = (mergedData) => {
       return;
     }
 
-    const schema = TEMPLATE_SCHEMA[sheetName];
-    const headers = data.allRows.slice(0, schema.dataStartRow);
-    const dataRows = data.allRows.slice(schema.dataStartRow);
+    // Header is now just the first row (row 3 from original Excel)
+    const headers = [data.allRows[0]];
+    const dataRows = data.allRows.slice(1);
 
     const seen = new Set();
     const uniqueRows = [];
@@ -172,11 +172,11 @@ export const getMergeStats = (parsedFiles, mergedData) => {
   const sheetNames = ['Site Information', 'CT Capabilities', 'MRI Capabilities'];
 
   sheetNames.forEach(sheetName => {
-    const schema = TEMPLATE_SCHEMA[sheetName];
     const data = mergedData[sheetName];
 
     if (data && data.allRows) {
-      stats.totalRows[sheetName] = data.allRows.length - schema.dataStartRow;
+      // Subtract 1 for the header row to get count of data rows only
+      stats.totalRows[sheetName] = data.allRows.length - 1;
     } else {
       stats.totalRows[sheetName] = 0;
     }
