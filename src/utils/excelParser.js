@@ -97,16 +97,11 @@ const parseSheet = (sheet, sheetName) => {
   for (let rowIdx = schema.dataStartRow; rowIdx < rawData.length; rowIdx++) {
     const row = rawData[rowIdx];
 
-    // Check if row is empty
+    // Check if row is completely empty (no data in any cell)
     const isEmpty = !row || row.every(cell => !cell || String(cell).trim() === '');
     if (isEmpty) continue;
 
-    // Check if Site ID is present (col 1)
-    const siteId = row[1];
-    if (!siteId || String(siteId).trim() === '') {
-      continue; // Skip rows without Site ID
-    }
-
+    // Include ALL rows with any data - validation will handle missing required fields
     // Store raw row data as array
     dataRows.push({
       rowIndex: rowIdx,
