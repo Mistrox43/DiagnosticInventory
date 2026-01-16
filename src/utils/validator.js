@@ -85,10 +85,37 @@ const validateSheet = (fileName, sheetName, sheetData, extraColumns, allFiles) =
     const isEmpty = !rowData || rowData.every(cell => !cell || String(cell).trim() === '');
     if (isEmpty) return;
 
-    // Check if Site ID exists (col 1)
+    // Check for missing required identifier fields (Facility ID and Site ID)
+    const facilityId = rowData[0];
     const siteId = rowData[1];
-    if (!siteId || String(siteId).trim() === '') {
-      return; // Skip rows without Site ID
+    const hasFacilityId = facilityId && String(facilityId).trim() !== '';
+    const hasSiteId = siteId && String(siteId).trim() !== '';
+
+    // If row has any data but missing Facility ID, report error
+    if (!hasFacilityId) {
+      issues.push({
+        file: fileName,
+        sheet: sheetName,
+        row: excelRow,
+        column: getColumnLetter(0),
+        field: 'Facility ID*',
+        severity: 'error',
+        message: 'Missing Facility ID - this is a required field'
+      });
+    }
+
+    // If row has any data but missing Site ID, report error
+    if (!hasSiteId) {
+      issues.push({
+        file: fileName,
+        sheet: sheetName,
+        row: excelRow,
+        column: getColumnLetter(1),
+        field: 'Site ID*',
+        severity: 'error',
+        message: 'Missing Site ID - this is a required field'
+      });
+      return; // Skip further validation if no Site ID (needed for duplicate checking)
     }
 
     // Check for duplicate Site ID within this file
@@ -109,7 +136,10 @@ const validateSheet = (fileName, sheetName, sheetData, extraColumns, allFiles) =
     }
 
     // Validate each field in the schema
+    // Skip col 0 (Facility ID) and col 1 (Site ID) as they're validated explicitly above
     schema.requiredFields.forEach(field => {
+      if (field.col === 0 || field.col === 1) return; // Already validated above
+
       const value = rowData[field.col];
       const result = validateValue(value, field.type, field.name, rowData, field);
 
