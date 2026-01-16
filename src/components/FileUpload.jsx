@@ -4,11 +4,11 @@ const FileUpload = ({ files, onFilesChange, onRemoveFile }) => {
   const handleFileChange = (e) => {
     const selectedFiles = Array.from(e.target.files);
     const excelFiles = selectedFiles.filter(file =>
-      file.name.endsWith('.xlsx') || file.name.endsWith('.xls')
+      file.name.endsWith('.xlsx') || file.name.endsWith('.xls') || file.name.endsWith('.xlsm')
     );
 
     if (excelFiles.length !== selectedFiles.length) {
-      alert('Only Excel files (.xlsx, .xls) are supported');
+      alert('Only Excel files (.xlsx, .xls, .xlsm) are supported');
     }
 
     if (excelFiles.length > 0) {
@@ -33,14 +33,14 @@ const FileUpload = ({ files, onFilesChange, onRemoveFile }) => {
     <div className="upload-section">
       <h2>Upload Excel Files</h2>
       <p style={{ marginBottom: '15px', color: '#666' }}>
-        Upload one or more Excel files containing Site Information, CT Capabilities, and MRI Capabilities tabs
+        Upload one or more Excel files (.xlsx, .xls, .xlsm) containing Site Information, CT Capabilities, and MRI Capabilities tabs
       </p>
 
       <div className="file-input-wrapper">
         <input
           type="file"
           multiple
-          accept=".xlsx,.xls"
+          accept=".xlsx,.xls,.xlsm"
           onChange={handleFileChange}
           className="file-input"
         />
