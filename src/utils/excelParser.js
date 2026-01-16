@@ -75,12 +75,20 @@ const parseSheet = (sheet, sheetName) => {
   const expectedColCount = schema.requiredFields.length;
   const actualColCount = headerRow.length;
 
-  // Identify extra columns
+  // Identify extra columns (only if header row has a value)
   const extraColumns = [];
   if (actualColCount > expectedColCount) {
     for (let i = expectedColCount; i < actualColCount; i++) {
-      const colName = headerRow[i] || `Column ${i + 1}`;
-      extraColumns.push({ index: i, name: colName });
+      const headerValue = headerRow[i];
+      // Only consider it a custom column if the header has a non-empty value
+      if (headerValue && String(headerValue).trim() !== '') {
+        const colLetter = XLSX.utils.encode_col(i);
+        extraColumns.push({
+          index: i,
+          name: String(headerValue).trim(),
+          columnLetter: colLetter
+        });
+      }
     }
   }
 

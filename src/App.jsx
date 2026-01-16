@@ -168,7 +168,10 @@ function App() {
       )}
 
       {allFilesValidated && (
-        <ValidationResults validationResults={validationResults} />
+        <ValidationResults
+          validationResults={validationResults}
+          parsedFiles={parsedFiles}
+        />
       )}
     </div>
   );

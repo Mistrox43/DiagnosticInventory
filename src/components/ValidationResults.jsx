@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-const ValidationResults = ({ validationResults }) => {
+const ValidationResults = ({ validationResults, parsedFiles }) => {
   const [activeTab, setActiveTab] = useState('file-level');
 
   if (!validationResults || Object.keys(validationResults).length === 0) {
@@ -43,6 +43,23 @@ const ValidationResults = ({ validationResults }) => {
   const crossFileErrors = Object.values(crossFileIssues).flat().filter(i => i.severity === 'error').length;
   const crossFileWarnings = Object.values(crossFileIssues).flat().filter(i => i.severity === 'warning').length;
 
+  // Count custom columns across all files
+  const countCustomColumns = () => {
+    if (!parsedFiles) return 0;
+
+    let count = 0;
+    parsedFiles.forEach(file => {
+      const sheetNames = ['Site Information', 'CT Capabilities', 'MRI Capabilities'];
+      sheetNames.forEach(sheetName => {
+        const extras = file.extraColumns[sheetName] || [];
+        count += extras.length;
+      });
+    });
+    return count;
+  };
+
+  const customColumnCount = countCustomColumns();
+
   const renderIssuesByFile = (issuesByFile) => {
     const hasIssues = Object.values(issuesByFile).some(issues => issues.length > 0);
 
@@ -78,6 +95,69 @@ const ValidationResults = ({ validationResults }) => {
         </div>
       );
     });
+  };
+
+  const renderCustomColumns = () => {
+    if (!parsedFiles || parsedFiles.length === 0) {
+      return (
+        <div className="no-issues">
+          No files to display custom columns for.
+        </div>
+      );
+    }
+
+    const sheetNames = ['Site Information', 'CT Capabilities', 'MRI Capabilities'];
+    let hasCustomColumns = false;
+
+    const filesWithCustomColumns = parsedFiles.map((file, fileIndex) => {
+      const fileCustomColumns = {};
+      let fileHasCustomColumns = false;
+
+      sheetNames.forEach(sheetName => {
+        const extras = file.extraColumns[sheetName] || [];
+        if (extras.length > 0) {
+          fileCustomColumns[sheetName] = extras;
+          fileHasCustomColumns = true;
+          hasCustomColumns = true;
+        }
+      });
+
+      if (!fileHasCustomColumns) return null;
+
+      return (
+        <div key={fileIndex} className="file-results">
+          <h3>{file.fileName}</h3>
+          {sheetNames.map(sheetName => {
+            const extras = fileCustomColumns[sheetName];
+            if (!extras || extras.length === 0) return null;
+
+            return (
+              <div key={sheetName} className="custom-column-sheet">
+                <div className="sheet-header">{sheetName}</div>
+                <div className="custom-columns-list">
+                  {extras.map((col, idx) => (
+                    <div key={idx} className="custom-column-item">
+                      <span className="column-letter">Column {col.columnLetter}</span>
+                      <span className="column-name">"{col.name}"</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      );
+    });
+
+    if (!hasCustomColumns) {
+      return (
+        <div className="no-issues">
+          No custom columns found in any files!
+        </div>
+      );
+    }
+
+    return filesWithCustomColumns;
   };
 
   return (
@@ -132,6 +212,13 @@ const ValidationResults = ({ validationResults }) => {
                 </span>
               )}
             </button>
+            <button
+              className={`validation-tab ${activeTab === 'custom-columns' ? 'active' : ''}`}
+              onClick={() => setActiveTab('custom-columns')}
+            >
+              <span className="tab-label">Custom Columns Included</span>
+              <span className="tab-count">({customColumnCount})</span>
+            </button>
           </div>
 
           <div className="tab-content">
@@ -150,6 +237,15 @@ const ValidationResults = ({ validationResults }) => {
                   <p>Issues that occur when merging multiple files (duplicate Site IDs across files, conflicts, etc.)</p>
                 </div>
                 {renderIssuesByFile(crossFileIssues)}
+              </div>
+            )}
+
+            {activeTab === 'custom-columns' && (
+              <div className="tab-panel">
+                <div className="tab-description">
+                  <p>Custom columns found in uploaded files beyond the standard template columns. These columns will be preserved in the merged output.</p>
+                </div>
+                {renderCustomColumns()}
               </div>
             )}
           </div>
