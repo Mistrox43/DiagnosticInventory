@@ -1,4 +1,5 @@
-import { VALIDATION_RULES, STANDARD_COLUMNS } from '../validationRules';
+import { TEMPLATE_SCHEMA, validateValue, validateSubregion } from '../validationRules';
+import { getColumnLetter } from './excelParser';
 
 /**
  * Validate a single file's data
@@ -8,36 +9,32 @@ import { VALIDATION_RULES, STANDARD_COLUMNS } from '../validationRules';
  */
 export const validateFile = (parsedFile, allFiles = []) => {
   const issues = [];
-  const requiredTabs = ['Site Information', 'CT Capabilities', 'MRI Capabilities'];
+  const requiredSheets = ['Site Information', 'CT Capabilities', 'MRI Capabilities'];
 
-  // Build context for cross-tab validation
-  const context = {
-    siteInformation: parsedFile.sheets['Site Information']?.data || []
-  };
-
-  // Check for missing tabs
-  requiredTabs.forEach(tabName => {
-    if (!parsedFile.sheets[tabName]) {
+  // Check for missing sheets
+  requiredSheets.forEach(sheetName => {
+    if (!parsedFile.sheets[sheetName]) {
       issues.push({
-        fileName: parsedFile.fileName,
-        tab: 'File Structure',
-        row: 'N/A',
-        field: tabName,
-        issue: `Missing required tab: ${tabName}`,
-        severity: 'error'
+        file: parsedFile.fileName,
+        sheet: sheetName,
+        row: '-',
+        column: '-',
+        field: '-',
+        severity: 'error',
+        message: `Required sheet "${sheetName}" not found`
       });
     }
   });
 
-  // Validate each required tab
-  requiredTabs.forEach(tabName => {
-    if (parsedFile.sheets[tabName]) {
+  // Validate each sheet
+  requiredSheets.forEach(sheetName => {
+    if (parsedFile.sheets[sheetName]) {
       const sheetIssues = validateSheet(
         parsedFile.fileName,
-        tabName,
-        parsedFile.sheets[tabName],
-        allFiles,
-        context
+        sheetName,
+        parsedFile.sheets[sheetName],
+        parsedFile.extraColumns[sheetName] || [],
+        allFiles
       );
       issues.push(...sheetIssues);
     }
@@ -49,76 +46,84 @@ export const validateFile = (parsedFile, allFiles = []) => {
 /**
  * Validate a single sheet
  * @param {string} fileName - Name of the file
- * @param {string} tabName - Name of the tab/sheet
- * @param {Object} sheetData - Sheet data with data and columns
+ * @param {string} sheetName - Name of the sheet
+ * @param {Object} sheetData - Sheet data with data array
+ * @param {Array} extraColumns - Extra columns in this sheet
  * @param {Array<Object>} allFiles - All files for cross-file validation
- * @param {Object} context - Context for cross-tab validation
  * @returns {Array<Object>} - Array of validation issues
  */
-const validateSheet = (fileName, tabName, sheetData, allFiles, context) => {
+const validateSheet = (fileName, sheetName, sheetData, extraColumns, allFiles) => {
   const issues = [];
-  const { data, columns } = sheetData;
-  const standardColumns = STANDARD_COLUMNS[tabName] || [];
-  const rules = VALIDATION_RULES[tabName] || [];
+  const schema = TEMPLATE_SCHEMA[sheetName];
 
-  // Check for missing standard columns
-  const missingColumns = standardColumns.filter(col => !columns.includes(col));
-  missingColumns.forEach(col => {
-    issues.push({
-      fileName,
-      tab: tabName,
-      row: 'Header',
-      field: col,
-      issue: `Missing required column: ${col}`,
-      severity: 'error'
-    });
-  });
+  if (!schema) return issues;
 
-  // If no data rows, warn but don't fail
-  if (data.length === 0) {
+  const { data } = sheetData;
+
+  // If no data rows, add warning
+  if (!data || data.length === 0) {
     issues.push({
-      fileName,
-      tab: tabName,
-      row: 'N/A',
+      file: fileName,
+      sheet: sheetName,
+      row: '-',
+      column: '-',
       field: 'Data',
-      issue: 'Sheet contains no data rows',
-      severity: 'warning'
+      severity: 'warning',
+      message: 'Sheet contains no data rows'
     });
     return issues;
   }
 
-  // Collect all data from same tab across all files for cross-file validation
-  const allTabData = [];
-  if (allFiles.length > 0) {
-    allFiles.forEach(file => {
-      if (file.sheets[tabName]?.data) {
-        allTabData.push(...file.sheets[tabName].data);
-      }
-    });
-  } else {
-    allTabData.push(...data);
-  }
-
   // Validate each row
-  data.forEach((row, index) => {
-    const rowNumber = index + 2; // +2 because Excel is 1-indexed and first row is header
+  data.forEach((rowObj) => {
+    const { rowData, excelRow } = rowObj;
 
-    // Apply validation rules
-    rules.forEach(rule => {
-      const value = row[rule.field];
-      const isValid = rule.validate(value, row, allTabData, context);
+    // Check if row is empty (should have been filtered, but double-check)
+    const isEmpty = !rowData || rowData.every(cell => !cell || String(cell).trim() === '');
+    if (isEmpty) return;
 
-      if (!isValid) {
+    // Check if Site ID exists (col 1)
+    const siteId = rowData[1];
+    if (!siteId || String(siteId).trim() === '') {
+      return; // Skip rows without Site ID
+    }
+
+    // Validate each field in the schema
+    schema.requiredFields.forEach(field => {
+      const value = rowData[field.col];
+      const result = validateValue(value, field.type, field.name, rowData, field);
+
+      if (!result.valid) {
         issues.push({
-          fileName,
-          tab: tabName,
-          row: rowNumber,
-          field: rule.field,
-          issue: rule.description,
-          severity: 'error'
+          file: fileName,
+          sheet: sheetName,
+          row: excelRow,
+          column: getColumnLetter(field.col),
+          field: field.name,
+          severity: field.required ? 'error' : 'warning',
+          message: result.message
         });
       }
     });
+
+    // Special validation for Site Information: Sub-region validation
+    if (sheetName === 'Site Information') {
+      const region = rowData[7]; // Ontario Health Region
+      const subregion = rowData[8]; // Sub-region
+      const subResult = validateSubregion(region, subregion);
+
+      if (!subResult.valid) {
+        issues.push({
+          file: fileName,
+          sheet: sheetName,
+          row: excelRow,
+          column: getColumnLetter(8),
+          field: 'Sub-region',
+          severity: 'error',
+          message: subResult.message
+        });
+      }
+    }
   });
 
   return issues;

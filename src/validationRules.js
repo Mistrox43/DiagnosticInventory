@@ -1,253 +1,254 @@
-// Validation rules for each tab
-// Each rule has: field, description, validate function that returns true if valid
+// Validation rules for MRI/CT Site Directory v5.1.1
+// Based on Ontario Health - Central Wait Time Management Program template
 
-export const STANDARD_COLUMNS = {
-  'Site Information': [
-    'Site ID',
-    'Site Name',
-    'Country',
-    'City',
-    'Address',
-    'Contact Name',
-    'Contact Email',
-    'Contact Phone',
-    'Status'
-  ],
-  'CT Capabilities': [
-    'Site ID',
-    'CT Manufacturer',
-    'CT Model',
-    'Number of Slices',
-    'Installation Date',
-    'Last Service Date',
-    'Status',
-    'Contrast Injection Available'
-  ],
-  'MRI Capabilities': [
-    'Site ID',
-    'MRI Manufacturer',
-    'MRI Model',
-    'Field Strength',
-    'Installation Date',
-    'Last Service Date',
-    'Status',
-    'Coils Available'
-  ]
+// Valid regions and their corresponding sub-regions
+export const VALID_REGIONS = ['Central', 'East', 'North East', 'North West', 'Toronto', 'West'];
+
+export const VALID_SUBREGIONS = {
+  'Central': ['Central West', 'Central', 'North Simcoe Muskoka', 'Mississauga Halton'],
+  'East': ['South East', 'Champlain', 'Central East'],
+  'Toronto': ['Toronto Central', 'Toronto North', 'Toronto South'],
+  'West': ['Erie St. Clair', 'South West', 'Waterloo Wellington', 'Hamilton Niagara Haldimand Brant'],
+  'North East': ['North East'],
+  'North West': ['North West']
 };
 
-export const VALIDATION_RULES = {
-  'Site Information': [
-    {
-      field: 'Site ID',
-      description: 'Site ID is required and must not be empty',
-      validate: (value) => value !== undefined && value !== null && String(value).trim() !== ''
-    },
-    {
-      field: 'Site ID',
-      description: 'Site ID must be unique across all files',
-      validate: (value, row, allData) => {
-        if (!value) return true; // Skip if empty (caught by required check)
-        const siteIds = allData.map(r => r['Site ID']).filter(id => id);
-        const count = siteIds.filter(id => String(id).trim() === String(value).trim()).length;
-        return count === 1;
-      },
-      crossFile: true
-    },
-    {
-      field: 'Site Name',
-      description: 'Site Name is required and must not be empty',
-      validate: (value) => value !== undefined && value !== null && String(value).trim() !== ''
-    },
-    {
-      field: 'Country',
-      description: 'Country is required and must not be empty',
-      validate: (value) => value !== undefined && value !== null && String(value).trim() !== ''
-    },
-    {
-      field: 'Contact Email',
-      description: 'Contact Email must be a valid email format if provided',
-      validate: (value) => {
-        if (!value || String(value).trim() === '') return true;
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        return emailRegex.test(String(value).trim());
-      }
-    },
-    {
-      field: 'Contact Phone',
-      description: 'Contact Phone must contain only numbers, spaces, dashes, and parentheses if provided',
-      validate: (value) => {
-        if (!value || String(value).trim() === '') return true;
-        const phoneRegex = /^[\d\s\-\(\)\+]+$/;
-        return phoneRegex.test(String(value).trim());
-      }
-    },
-    {
-      field: 'Status',
-      description: 'Status must be one of: Active, Inactive, Pending',
-      validate: (value) => {
-        if (!value) return false;
-        const validStatuses = ['Active', 'Inactive', 'Pending'];
-        return validStatuses.includes(String(value).trim());
-      }
-    }
-  ],
-  'CT Capabilities': [
-    {
-      field: 'Site ID',
-      description: 'Site ID is required and must not be empty',
-      validate: (value) => value !== undefined && value !== null && String(value).trim() !== ''
-    },
-    {
-      field: 'Site ID',
-      description: 'Site ID must exist in Site Information tab',
-      validate: (value, row, allData, context) => {
-        if (!value || !context?.siteInformation) return true;
-        const siteIds = context.siteInformation.map(r => r['Site ID']).filter(id => id);
-        return siteIds.some(id => String(id).trim() === String(value).trim());
-      },
-      crossTab: true
-    },
-    {
-      field: 'CT Manufacturer',
-      description: 'CT Manufacturer is required and must not be empty',
-      validate: (value) => value !== undefined && value !== null && String(value).trim() !== ''
-    },
-    {
-      field: 'CT Model',
-      description: 'CT Model is required and must not be empty',
-      validate: (value) => value !== undefined && value !== null && String(value).trim() !== ''
-    },
-    {
-      field: 'Number of Slices',
-      description: 'Number of Slices must be a positive number',
-      validate: (value) => {
-        if (!value) return false;
-        const num = Number(value);
-        return !isNaN(num) && num > 0 && Number.isInteger(num);
-      }
-    },
-    {
-      field: 'Installation Date',
-      description: 'Installation Date must be a valid date',
-      validate: (value) => {
-        if (!value || String(value).trim() === '') return true;
-        const date = new Date(value);
-        return !isNaN(date.getTime());
-      }
-    },
-    {
-      field: 'Last Service Date',
-      description: 'Last Service Date must be a valid date and not before Installation Date',
-      validate: (value, row) => {
-        if (!value || String(value).trim() === '') return true;
-        const serviceDate = new Date(value);
-        if (isNaN(serviceDate.getTime())) return false;
-
-        if (row['Installation Date']) {
-          const installDate = new Date(row['Installation Date']);
-          if (!isNaN(installDate.getTime()) && serviceDate < installDate) {
-            return false;
-          }
-        }
-        return true;
-      }
-    },
-    {
-      field: 'Status',
-      description: 'Status must be one of: Operational, Under Maintenance, Decommissioned',
-      validate: (value) => {
-        if (!value) return false;
-        const validStatuses = ['Operational', 'Under Maintenance', 'Decommissioned'];
-        return validStatuses.includes(String(value).trim());
-      }
-    },
-    {
-      field: 'Contrast Injection Available',
-      description: 'Contrast Injection Available must be Yes or No',
-      validate: (value) => {
-        if (!value) return false;
-        const valid = ['Yes', 'No', 'YES', 'NO', 'yes', 'no'];
-        return valid.includes(String(value).trim());
-      }
-    }
-  ],
-  'MRI Capabilities': [
-    {
-      field: 'Site ID',
-      description: 'Site ID is required and must not be empty',
-      validate: (value) => value !== undefined && value !== null && String(value).trim() !== ''
-    },
-    {
-      field: 'Site ID',
-      description: 'Site ID must exist in Site Information tab',
-      validate: (value, row, allData, context) => {
-        if (!value || !context?.siteInformation) return true;
-        const siteIds = context.siteInformation.map(r => r['Site ID']).filter(id => id);
-        return siteIds.some(id => String(id).trim() === String(value).trim());
-      },
-      crossTab: true
-    },
-    {
-      field: 'MRI Manufacturer',
-      description: 'MRI Manufacturer is required and must not be empty',
-      validate: (value) => value !== undefined && value !== null && String(value).trim() !== ''
-    },
-    {
-      field: 'MRI Model',
-      description: 'MRI Model is required and must not be empty',
-      validate: (value) => value !== undefined && value !== null && String(value).trim() !== ''
-    },
-    {
-      field: 'Field Strength',
-      description: 'Field Strength must be a positive number (e.g., 1.5, 3.0, 7.0)',
-      validate: (value) => {
-        if (!value) return false;
-        const num = Number(value);
-        return !isNaN(num) && num > 0;
-      }
-    },
-    {
-      field: 'Installation Date',
-      description: 'Installation Date must be a valid date',
-      validate: (value) => {
-        if (!value || String(value).trim() === '') return true;
-        const date = new Date(value);
-        return !isNaN(date.getTime());
-      }
-    },
-    {
-      field: 'Last Service Date',
-      description: 'Last Service Date must be a valid date and not before Installation Date',
-      validate: (value, row) => {
-        if (!value || String(value).trim() === '') return true;
-        const serviceDate = new Date(value);
-        if (isNaN(serviceDate.getTime())) return false;
-
-        if (row['Installation Date']) {
-          const installDate = new Date(row['Installation Date']);
-          if (!isNaN(installDate.getTime()) && serviceDate < installDate) {
-            return false;
-          }
-        }
-        return true;
-      }
-    },
-    {
-      field: 'Status',
-      description: 'Status must be one of: Operational, Under Maintenance, Decommissioned',
-      validate: (value) => {
-        if (!value) return false;
-        const validStatuses = ['Operational', 'Under Maintenance', 'Decommissioned'];
-        return validStatuses.includes(String(value).trim());
-      }
-    },
-    {
-      field: 'Coils Available',
-      description: 'Coils Available should list available coils if provided',
-      validate: (value) => {
-        // This is a text field, just check it's not empty if required
-        return true; // Optional field
-      }
-    }
-  ]
+// Template schema definition - headers at row 3 (index 2), data starts at row 4 (index 3)
+export const TEMPLATE_SCHEMA = {
+  'Site Information': {
+    headerRow: 2,
+    dataStartRow: 3,
+    requiredFields: [
+      { col: 0, name: 'Facility ID', type: 'text', required: true },
+      { col: 1, name: 'Site ID', type: 'text', required: true },
+      { col: 2, name: 'Facility Name', type: 'text', required: true },
+      { col: 3, name: 'Site Name', type: 'text', required: true },
+      { col: 4, name: 'Street Address', type: 'text', required: true },
+      { col: 5, name: 'City', type: 'text', required: true },
+      { col: 6, name: 'Postal Code', type: 'postal', required: true },
+      { col: 7, name: 'Ontario Health Region', type: 'region', required: true },
+      { col: 8, name: 'Sub-region', type: 'subregion', required: true },
+      { col: 9, name: 'Performs CT?', type: 'yesno', required: true },
+      { col: 10, name: 'Performs MRI?', type: 'yesno', required: true },
+      { col: 11, name: 'Site Phone CT', type: 'phone', required: false, conditionalOn: { col: 9, value: 'Yes' } },
+      { col: 12, name: 'Site Fax CT', type: 'phone', required: false, conditionalOn: { col: 9, value: 'Yes' } },
+      { col: 13, name: 'Site Phone MRI', type: 'phone', required: false, conditionalOn: { col: 10, value: 'Yes' } },
+      { col: 14, name: 'Site Fax MRI', type: 'phone', required: false, conditionalOn: { col: 10, value: 'Yes' } },
+      { col: 15, name: 'Booking Contact Email CT', type: 'email', required: false },
+      { col: 16, name: 'Booking Contact Email MRI', type: 'email', required: false },
+      { col: 17, name: 'Multi-site facility', type: 'yesno', required: false },
+      { col: 18, name: 'Multi-site Name', type: 'text', required: false },
+      { col: 19, name: 'OHIP', type: 'yesno', required: true },
+      { col: 20, name: 'WSIB', type: 'yesno', required: true },
+      { col: 21, name: 'DND', type: 'yesno', required: true },
+      { col: 22, name: 'IFH', type: 'yesno', required: true },
+      { col: 23, name: 'RAMQ', type: 'yesno', required: true },
+      { col: 24, name: 'Other Payment', type: 'text', required: false },
+      { col: 25, name: 'Wheelchair accessible', type: 'yesno', required: true },
+      { col: 26, name: 'Stretcher accessible', type: 'yesno', required: true },
+      { col: 27, name: 'Hoyer lift available', type: 'yesno', required: true },
+      { col: 28, name: 'Hearing Impaired', type: 'yesno', required: true },
+      { col: 29, name: 'Accessible parking', type: 'yesno', required: true },
+      { col: 30, name: 'Bariatric patients', type: 'yesno', required: true },
+      { col: 31, name: 'Interpreter Services', type: 'yesno', required: true },
+      { col: 32, name: 'PICC/Port-a-Cath', type: 'yesno', required: true },
+      { col: 33, name: 'Last Updated Date', type: 'date', required: true },
+      { col: 34, name: 'Completed By', type: 'text', required: true }
+    ]
+  },
+  'CT Capabilities': {
+    headerRow: 2,
+    dataStartRow: 3,
+    requiredFields: [
+      { col: 0, name: 'Facility ID', type: 'text', required: true },
+      { col: 1, name: 'Site ID', type: 'text', required: true },
+      { col: 2, name: 'Facility Name', type: 'text', required: false },
+      { col: 3, name: 'Site Name', type: 'text', required: false },
+      { col: 4, name: 'Perform CT', type: 'yesno', required: true },
+      { col: 5, name: 'Cardiac CT', type: 'yesno', required: true },
+      { col: 6, name: 'Cardiac CT Exams', type: 'multiselect', required: false, conditionalOn: { col: 5, value: 'Yes' } },
+      { col: 7, name: 'CT Myeloma Scan', type: 'yesno', required: true },
+      { col: 8, name: 'CT Colonography', type: 'yesno', required: true },
+      { col: 9, name: 'CT Guided Biopsy', type: 'yesno', required: true },
+      { col: 10, name: 'CT Guided Biopsy Area', type: 'multiselect', required: false, conditionalOn: { col: 9, value: 'Yes' } },
+      { col: 11, name: 'Vascular CT', type: 'yesno', required: true },
+      { col: 12, name: 'Vascular CT area', type: 'multiselect', required: false, conditionalOn: { col: 11, value: 'Yes' } },
+      { col: 13, name: 'Other exams', type: 'text', required: false },
+      { col: 14, name: 'Adult CT', type: 'yesno', required: true },
+      { col: 15, name: 'General anesthesia (non-paediatric)', type: 'yesno', required: true },
+      { col: 16, name: 'Paediatric CT', type: 'yesno', required: true },
+      { col: 17, name: 'Min age non-sedate', type: 'age', required: true },
+      { col: 18, name: 'Min age GA', type: 'age', required: true },
+      { col: 19, name: 'Max weight CT', type: 'number', required: true }
+    ]
+  },
+  'MRI Capabilities': {
+    headerRow: 2,
+    dataStartRow: 3,
+    requiredFields: [
+      { col: 0, name: 'Facility ID', type: 'text', required: true },
+      { col: 1, name: 'Site ID', type: 'text', required: true },
+      { col: 2, name: 'Facility Name', type: 'text', required: false },
+      { col: 3, name: 'Site Name', type: 'text', required: false },
+      { col: 4, name: 'Perform MRI', type: 'yesno', required: true },
+      { col: 5, name: 'Cardiac MRI', type: 'yesno', required: true },
+      { col: 6, name: 'Breast MRI', type: 'yesno', required: true },
+      { col: 7, name: 'Vascular MRI', type: 'yesno', required: true },
+      { col: 8, name: 'Vascular MRI area', type: 'multiselect', required: false, conditionalOn: { col: 7, value: 'Yes' } },
+      { col: 9, name: 'Other exams', type: 'text', required: false },
+      { col: 10, name: 'CIED', type: 'yesno', required: true },
+      { col: 11, name: 'Aneurysm clips', type: 'yesno', required: true },
+      { col: 12, name: 'Aneurysm coils', type: 'yesno', required: true },
+      { col: 13, name: 'Neurostimulator', type: 'yesno', required: true },
+      { col: 14, name: 'Cochlear implant', type: 'yesno', required: true },
+      { col: 15, name: 'Programmable shunts', type: 'yesno', required: true },
+      { col: 16, name: 'Adult MRI', type: 'yesno', required: true },
+      { col: 17, name: 'General anesthesia (non-paediatric)', type: 'yesno', required: true },
+      { col: 18, name: 'Paediatric MRI', type: 'yesno', required: true },
+      { col: 19, name: 'Min age non-sedate', type: 'age', required: true },
+      { col: 20, name: 'Min age GA', type: 'age', required: true },
+      { col: 21, name: 'Max weight MRI', type: 'number', required: true },
+      { col: 22, name: '1.5T available', type: 'yesno', required: true },
+      { col: 23, name: '3T available', type: 'yesno', required: true },
+      { col: 24, name: 'Max bore diameter', type: 'number', required: true }
+    ]
+  }
 };
+
+/**
+ * Validate a single value based on its type
+ * @param {*} value - The value to validate
+ * @param {string} type - The validation type
+ * @param {string} fieldName - The field name (for error messages)
+ * @param {Array} rowData - The entire row data (for conditional validation)
+ * @param {Object} fieldDef - The field definition
+ * @returns {Object} - { valid: boolean, message: string }
+ */
+export function validateValue(value, type, fieldName, rowData, fieldDef) {
+  const strValue = value !== undefined && value !== null ? String(value).trim() : '';
+
+  // Check conditional requirements
+  if (fieldDef.conditionalOn) {
+    const conditionValue = rowData[fieldDef.conditionalOn.col];
+    const conditionMet = String(conditionValue).trim().toLowerCase() === fieldDef.conditionalOn.value.toLowerCase();
+
+    if (conditionMet && !strValue) {
+      return { valid: false, message: `Required when ${findFieldNameByCol(rowData, fieldDef.conditionalOn.col)} is "${fieldDef.conditionalOn.value}"` };
+    }
+
+    // If condition not met, field is optional
+    if (!conditionMet) {
+      return { valid: true };
+    }
+  }
+
+  // Check required fields
+  if (fieldDef.required && !strValue) {
+    return { valid: false, message: 'Required field is empty' };
+  }
+
+  // If not required and empty, it's valid
+  if (!strValue) return { valid: true };
+
+  // Type-specific validation
+  switch (type) {
+    case 'yesno':
+      if (!['yes', 'no'].includes(strValue.toLowerCase())) {
+        return { valid: false, message: `Must be "Yes" or "No", got "${strValue}"` };
+      }
+      break;
+
+    case 'region':
+      if (!VALID_REGIONS.includes(strValue)) {
+        return { valid: false, message: `Invalid region "${strValue}". Must be one of: ${VALID_REGIONS.join(', ')}` };
+      }
+      break;
+
+    case 'postal':
+      const postalRegex = /^[A-Za-z]\d[A-Za-z][ ]?\d[A-Za-z]\d$/;
+      if (!postalRegex.test(strValue)) {
+        return { valid: false, message: `Invalid postal code format "${strValue}". Expected format: A1A 1A1` };
+      }
+      break;
+
+    case 'email':
+      if (strValue && !strValue.includes('@')) {
+        return { valid: false, message: `Invalid email format "${strValue}"` };
+      }
+      break;
+
+    case 'phone':
+      const digits = strValue.replace(/\D/g, '');
+      if (digits.length < 10) {
+        return { valid: false, message: `Phone number should have at least 10 digits, got ${digits.length}` };
+      }
+      break;
+
+    case 'number':
+      if (isNaN(Number(strValue))) {
+        return { valid: false, message: `Must be a number, got "${strValue}"` };
+      }
+      break;
+
+    case 'age':
+      if (strValue.toLowerCase() !== 'na') {
+        const age = Number(strValue);
+        if (isNaN(age) || age < 0 || age > 18) {
+          return { valid: false, message: `Must be 0-18 or "NA", got "${strValue}"` };
+        }
+      }
+      break;
+
+    case 'date':
+      const dateVal = new Date(strValue);
+      if (isNaN(dateVal.getTime())) {
+        return { valid: false, message: `Invalid date format "${strValue}"` };
+      }
+      break;
+
+    case 'multiselect':
+      // Multiselect fields can contain comma-separated values - just validate not empty if required
+      // No specific validation needed beyond required check
+      break;
+
+    case 'text':
+    default:
+      // Text fields - no specific validation beyond required check
+      break;
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Validate sub-region against its region
+ * @param {string} region - The region value
+ * @param {string} subregion - The sub-region value
+ * @returns {Object} - { valid: boolean, message: string }
+ */
+export function validateSubregion(region, subregion) {
+  if (!region || !subregion) return { valid: true };
+
+  const validSubs = VALID_SUBREGIONS[region];
+  if (!validSubs) return { valid: true };
+
+  if (!validSubs.includes(subregion)) {
+    return {
+      valid: false,
+      message: `Sub-region "${subregion}" is not valid for region "${region}". Valid options: ${validSubs.join(', ')}`
+    };
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Helper function to find field name by column index
+ * @param {Array} rowData - The row data
+ * @param {number} col - The column index
+ * @returns {string} - The field name
+ */
+function findFieldNameByCol(rowData, col) {
+  // This is a helper for error messages - in practice we'd need to pass schema
+  return `column ${col}`;
+}

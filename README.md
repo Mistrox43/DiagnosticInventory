@@ -1,18 +1,18 @@
-# Diagnostic Inventory Validator
+# MRI/CT Site Directory Validator & Merger
 
-A web-based application for validating and merging Excel files containing diagnostic equipment inventory data. The application runs entirely in the browser with no backend required.
+A web-based application for validating and merging MRI/CT Site Directory Excel files (v5.1.1). This tool is designed for the Ontario Health - Central Wait Time Management Program. The application runs entirely in the browser with no backend required.
 
 ## Features
 
-- **File Upload**: Upload multiple Excel files (.xlsx, .xls)
-- **Data Validation**: Comprehensive validation rules for three required tabs:
+- **File Upload**: Upload multiple Site Directory Excel files (.xlsx, .xlsm)
+- **Data Validation**: Comprehensive validation rules for three required sheets:
   - Site Information
   - CT Capabilities
   - MRI Capabilities
-- **Detailed Error Reporting**: Explicit identification of tab, row, and data quality issues
+- **Detailed Error Reporting**: Explicit identification of sheet, row, column, and data quality issues
 - **Custom Column Support**: Automatically handles extra columns added to standard templates
-- **File Merging**: Combine multiple files into a single Excel file
-- **Zero Backend**: All processing happens locally in your browser
+- **File Merging**: Combine multiple files into a single Excel file with deduplication
+- **Zero Backend**: All processing happens locally in your browser - your data never leaves your computer
 - **Netlify Ready**: Configured for easy deployment to Netlify
 
 ## Tech Stack
@@ -81,9 +81,14 @@ netlify deploy --prod --dir=dist
 
 ## Excel File Requirements
 
-### Required Tabs
+### File Structure
 
-Each Excel file must contain three tabs with the following names (exact match):
+- **Headers**: Row 3 (Excel row 3)
+- **Data**: Starts at Row 4 (Excel row 4)
+
+### Required Sheets
+
+Each Excel file must contain three sheets with the following names (exact match):
 
 1. **Site Information**
 2. **CT Capabilities**
@@ -91,66 +96,143 @@ Each Excel file must contain three tabs with the following names (exact match):
 
 ### Standard Columns
 
-#### Site Information
+#### Site Information (35 columns)
+- Facility ID (required)
 - Site ID (required, unique)
+- Facility Name (required)
 - Site Name (required)
-- Country (required)
-- City
-- Address
-- Contact Name
-- Contact Email (validated format)
-- Contact Phone (validated format)
-- Status (must be: Active, Inactive, or Pending)
+- Street Address (required)
+- City (required)
+- Postal Code (required, Canadian format: A1A 1A1)
+- Ontario Health Region (required, validated against list)
+- Sub-region (required, validated against region)
+- Performs CT? (required, Yes/No)
+- Performs MRI? (required, Yes/No)
+- Site Phone CT (conditional on Performs CT)
+- Site Fax CT (conditional on Performs CT)
+- Site Phone MRI (conditional on Performs MRI)
+- Site Fax MRI (conditional on Performs MRI)
+- Booking Contact Email CT
+- Booking Contact Email MRI
+- Multi-site facility (Yes/No)
+- Multi-site Name
+- OHIP (required, Yes/No)
+- WSIB (required, Yes/No)
+- DND (required, Yes/No)
+- IFH (required, Yes/No)
+- RAMQ (required, Yes/No)
+- Other Payment
+- Wheelchair accessible (required, Yes/No)
+- Stretcher accessible (required, Yes/No)
+- Hoyer lift available (required, Yes/No)
+- Hearing Impaired (required, Yes/No)
+- Accessible parking (required, Yes/No)
+- Bariatric patients (required, Yes/No)
+- Interpreter Services (required, Yes/No)
+- PICC/Port-a-Cath (required, Yes/No)
+- Last Updated Date (required, date format)
+- Completed By (required)
 
-#### CT Capabilities
-- Site ID (required, must exist in Site Information)
-- CT Manufacturer (required)
-- CT Model (required)
-- Number of Slices (required, positive integer)
-- Installation Date (date format)
-- Last Service Date (date format, must be after Installation Date)
-- Status (must be: Operational, Under Maintenance, or Decommissioned)
-- Contrast Injection Available (must be: Yes or No)
+#### CT Capabilities (20 columns)
+- Facility ID (required)
+- Site ID (required)
+- Facility Name
+- Site Name
+- Perform CT (required, Yes/No)
+- Cardiac CT (required, Yes/No)
+- Cardiac CT Exams (conditional on Cardiac CT)
+- CT Myeloma Scan (required, Yes/No)
+- CT Colonography (required, Yes/No)
+- CT Guided Biopsy (required, Yes/No)
+- CT Guided Biopsy Area (conditional on CT Guided Biopsy)
+- Vascular CT (required, Yes/No)
+- Vascular CT area (conditional on Vascular CT)
+- Other exams
+- Adult CT (required, Yes/No)
+- General anesthesia (non-paediatric) (required, Yes/No)
+- Paediatric CT (required, Yes/No)
+- Min age non-sedate (required, 0-18 or "NA")
+- Min age GA (required, 0-18 or "NA")
+- Max weight CT (required, number)
 
-#### MRI Capabilities
-- Site ID (required, must exist in Site Information)
-- MRI Manufacturer (required)
-- MRI Model (required)
-- Field Strength (required, positive number like 1.5, 3.0, 7.0)
-- Installation Date (date format)
-- Last Service Date (date format, must be after Installation Date)
-- Status (must be: Operational, Under Maintenance, or Decommissioned)
-- Coils Available
+#### MRI Capabilities (25 columns)
+- Facility ID (required)
+- Site ID (required)
+- Facility Name
+- Site Name
+- Perform MRI (required, Yes/No)
+- Cardiac MRI (required, Yes/No)
+- Breast MRI (required, Yes/No)
+- Vascular MRI (required, Yes/No)
+- Vascular MRI area (conditional on Vascular MRI)
+- Other exams
+- CIED (required, Yes/No)
+- Aneurysm clips (required, Yes/No)
+- Aneurysm coils (required, Yes/No)
+- Neurostimulator (required, Yes/No)
+- Cochlear implant (required, Yes/No)
+- Programmable shunts (required, Yes/No)
+- Adult MRI (required, Yes/No)
+- General anesthesia (non-paediatric) (required, Yes/No)
+- Paediatric MRI (required, Yes/No)
+- Min age non-sedate (required, 0-18 or "NA")
+- Min age GA (required, 0-18 or "NA")
+- Max weight MRI (required, number)
+- 1.5T available (required, Yes/No)
+- 3T available (required, Yes/No)
+- Max bore diameter (required, number)
+
+### Valid Ontario Health Regions and Sub-regions
+
+**Central**
+- Central West, Central, North Simcoe Muskoka, Mississauga Halton
+
+**East**
+- South East, Champlain, Central East
+
+**Toronto**
+- Toronto Central, Toronto North, Toronto South
+
+**West**
+- Erie St. Clair, South West, Waterloo Wellington, Hamilton Niagara Haldimand Brant
+
+**North East**
+- North East
+
+**North West**
+- North West
 
 ### Custom Columns
 
-You can add any additional columns to the standard templates. Custom columns:
+You can add any additional columns after the standard columns. Custom columns:
 - Will not be validated
 - Will be included in the merged output
 - Will be preserved exactly as provided
 
 ## Validation Rules
 
-The application performs two types of validation:
+The application performs comprehensive validation:
 
-### Single Field Validation
+### Field-Level Validation
 - Required field checks
-- Data type validation
-- Format validation (email, phone, dates)
-- Value range checks
-- Enumerated value checks
+- Data type validation (text, number, date)
+- Format validation (postal code, email, phone)
+- Value range checks (age 0-18 or "NA")
+- Enumerated value checks (Yes/No, regions, etc.)
+
+### Conditional Validation
+- Phone/fax fields required when "Performs CT/MRI?" is "Yes"
+- Detail fields required when parent capability is "Yes"
 
 ### Cross-Field Validation
-- Date logical consistency (service date after installation date)
-- Site ID uniqueness across files
-- Site ID existence across tabs
+- Sub-region must be valid for the selected Ontario Health Region
 
 ## Usage
 
-1. **Upload Files**: Click the file input and select one or more Excel files
+1. **Upload Files**: Click the file input and select one or more Site Directory Excel files
 2. **Validate**: Click "Validate Files" to run validation checks
-3. **Review Results**: View detailed validation results with specific row and column information
-4. **Merge**: Click "Merge Files" to combine all valid files into a single Excel file
+3. **Review Results**: View detailed validation results with specific row, column, and field information
+4. **Merge**: Click "Merge Files" to combine all files into a single Excel file
 5. **Download**: The merged file will automatically download to your computer
 
 ## File Structure
@@ -162,10 +244,10 @@ DiagnosticInventory/
 │   │   ├── FileUpload.jsx          # File upload component
 │   │   └── ValidationResults.jsx    # Validation results display
 │   ├── utils/
-│   │   ├── excelParser.js          # Excel file parsing
+│   │   ├── excelParser.js          # Excel file parsing and export
 │   │   ├── validator.js            # Validation engine
 │   │   └── merger.js               # File merging logic
-│   ├── validationRules.js          # Validation rule definitions
+│   ├── validationRules.js          # Complete schema and validation rules
 │   ├── App.jsx                     # Main application component
 │   ├── App.css                     # Application styles
 │   ├── main.jsx                    # Application entry point
@@ -175,6 +257,14 @@ DiagnosticInventory/
 ├── netlify.toml                    # Netlify configuration
 └── package.json                    # Dependencies and scripts
 ```
+
+## Version
+
+This tool is designed for Site Directory Template **v5.1.1**
+
+## Organization
+
+Ontario Health - Central Wait Time Management Program
 
 ## Contributing
 

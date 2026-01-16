@@ -85,8 +85,8 @@ function App() {
       const stats = getMergeStats(parsedFiles, deduplicated);
 
       // Generate filename with timestamp
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-      const fileName = `merged_diagnostic_inventory_${timestamp}.xlsx`;
+      const timestamp = new Date().toISOString().slice(0, 10);
+      const fileName = `MRI_CT_Site_Directory_Merged_${timestamp}.xlsx`;
 
       // Export to Excel
       exportToExcel(deduplicated, fileName);
@@ -120,8 +120,8 @@ function App() {
   return (
     <div className="app">
       <div className="header">
-        <h1>Diagnostic Inventory Validator</h1>
-        <p>Upload, validate, and merge Excel files with Site Information, CT Capabilities, and MRI Capabilities</p>
+        <h1>MRI/CT Site Directory Validator & Merger</h1>
+        <p>Upload, validate, and merge Site Directory files (v5.1.1) - Ontario Health Central Wait Time Management Program</p>
       </div>
 
       <FileUpload

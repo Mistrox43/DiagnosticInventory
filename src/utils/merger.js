@@ -1,83 +1,156 @@
+import { TEMPLATE_SCHEMA } from '../validationRules';
+import * as XLSX from 'xlsx';
+
 /**
  * Merge multiple Excel files into a single dataset
  * @param {Array<Object>} parsedFiles - Array of parsed file data
- * @returns {Object} - Merged data organized by sheet name
+ * @returns {Object} - Merged data organized by sheet name, ready for export
  */
 export const mergeFiles = (parsedFiles) => {
   const mergedData = {
-    'Site Information': [],
-    'CT Capabilities': [],
-    'MRI Capabilities': []
+    'Site Information': { headers: null, rows: [], extraCols: [] },
+    'CT Capabilities': { headers: null, rows: [], extraCols: [] },
+    'MRI Capabilities': { headers: null, rows: [], extraCols: [] }
   };
 
-  const requiredTabs = ['Site Information', 'CT Capabilities', 'MRI Capabilities'];
+  const sheetNames = ['Site Information', 'CT Capabilities', 'MRI Capabilities'];
 
-  // Collect all columns across all files for each tab (including custom columns)
-  const allColumns = {};
-  requiredTabs.forEach(tabName => {
-    allColumns[tabName] = new Set();
-  });
+  // Collect all extra columns across all files for each sheet
+  const allExtraCols = {
+    'Site Information': {},
+    'CT Capabilities': {},
+    'MRI Capabilities': {}
+  };
 
-  // First pass: collect all unique columns
-  parsedFiles.forEach(file => {
-    requiredTabs.forEach(tabName => {
-      if (file.sheets[tabName]) {
-        file.sheets[tabName].columns.forEach(col => {
-          allColumns[tabName].add(col);
-        });
-      }
+  parsedFiles.forEach(fileData => {
+    sheetNames.forEach(sheetName => {
+      const extras = fileData.extraColumns[sheetName] || [];
+      extras.forEach(extra => {
+        if (!allExtraCols[sheetName][extra.name]) {
+          allExtraCols[sheetName][extra.name] = Object.keys(allExtraCols[sheetName]).length;
+        }
+      });
     });
   });
 
-  // Second pass: merge data ensuring all columns are present
-  parsedFiles.forEach(file => {
-    requiredTabs.forEach(tabName => {
-      if (file.sheets[tabName] && file.sheets[tabName].data) {
-        file.sheets[tabName].data.forEach(row => {
-          // Create a new row with all columns (including missing ones as null)
-          const mergedRow = {};
-          allColumns[tabName].forEach(col => {
-            mergedRow[col] = row[col] !== undefined ? row[col] : null;
-          });
+  // Get header rows from first workbook
+  const firstWorkbook = parsedFiles[0].workbook;
 
-          // Add source file information (optional - can be removed if not needed)
-          mergedRow['_source_file'] = file.fileName;
+  sheetNames.forEach(sheetName => {
+    const sheet = firstWorkbook.Sheets[sheetName];
+    if (sheet) {
+      const data = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+      const schema = TEMPLATE_SCHEMA[sheetName];
 
-          mergedData[tabName].push(mergedRow);
+      // Copy header rows (rows 0 to dataStartRow-1)
+      mergedData[sheetName].headers = data.slice(0, schema.dataStartRow);
+
+      // Get extra column names
+      const extraColNames = Object.keys(allExtraCols[sheetName]);
+      mergedData[sheetName].extraCols = extraColNames;
+
+      // Add extra column headers to the header row
+      if (mergedData[sheetName].headers.length > 0 && extraColNames.length > 0) {
+        const lastHeaderRow = mergedData[sheetName].headers[schema.headerRow];
+        extraColNames.forEach(colName => {
+          lastHeaderRow.push(colName);
         });
       }
+    }
+  });
+
+  // Merge data rows from all files
+  parsedFiles.forEach(fileData => {
+    sheetNames.forEach(sheetName => {
+      const sheetData = fileData.sheets[sheetName];
+      if (!sheetData || !sheetData.data) return;
+
+      const rows = sheetData.data;
+      const extras = fileData.extraColumns[sheetName] || [];
+      const schema = TEMPLATE_SCHEMA[sheetName];
+
+      // Build map of extra column names to indices in this file
+      const fileExtraMap = {};
+      extras.forEach(extra => {
+        fileExtraMap[extra.name] = extra.index;
+      });
+
+      const extraColNames = Object.keys(allExtraCols[sheetName]);
+
+      // Process each data row
+      rows.forEach(rowObj => {
+        const row = rowObj.rowData;
+
+        // Get base row (standard columns)
+        const baseRow = row.slice(0, schema.requiredFields.length);
+
+        // Add extra columns
+        extraColNames.forEach(colName => {
+          if (fileExtraMap.hasOwnProperty(colName)) {
+            const idx = fileExtraMap[colName];
+            baseRow.push(row[idx] || '');
+          } else {
+            baseRow.push('');
+          }
+        });
+
+        mergedData[sheetName].rows.push(baseRow);
+      });
     });
   });
 
-  return mergedData;
+  // Convert to format expected by exporter
+  const exportData = {};
+  sheetNames.forEach(sheetName => {
+    const data = mergedData[sheetName];
+    exportData[sheetName] = {
+      allRows: data.headers.concat(data.rows)
+    };
+  });
+
+  return exportData;
 };
 
 /**
- * Remove duplicate rows based on key field (Site ID)
- * @param {Object} mergedData - Merged data by tab
- * @param {string} keyField - Field to use for deduplication
+ * Remove duplicate rows based on Site ID (col 1)
+ * @param {Object} mergedData - Merged data by sheet
  * @returns {Object} - Deduplicated data
  */
-export const deduplicateData = (mergedData, keyField = 'Site ID') => {
+export const deduplicateData = (mergedData) => {
   const deduplicated = {};
+  const sheetNames = ['Site Information', 'CT Capabilities', 'MRI Capabilities'];
 
-  Object.keys(mergedData).forEach(tabName => {
+  sheetNames.forEach(sheetName => {
+    const data = mergedData[sheetName];
+    if (!data || !data.allRows) {
+      deduplicated[sheetName] = data;
+      return;
+    }
+
+    const schema = TEMPLATE_SCHEMA[sheetName];
+    const headers = data.allRows.slice(0, schema.dataStartRow);
+    const dataRows = data.allRows.slice(schema.dataStartRow);
+
     const seen = new Set();
-    deduplicated[tabName] = [];
+    const uniqueRows = [];
 
-    mergedData[tabName].forEach(row => {
-      const key = row[keyField];
-      if (key && !seen.has(String(key).trim())) {
-        seen.add(String(key).trim());
-        // Remove the source file marker
-        const { _source_file, ...cleanRow } = row;
-        deduplicated[tabName].push(cleanRow);
-      } else if (!key) {
-        // Keep rows without key field (might be invalid but let validation catch it)
-        const { _source_file, ...cleanRow } = row;
-        deduplicated[tabName].push(cleanRow);
+    dataRows.forEach(row => {
+      const siteId = row[1]; // Site ID is at column 1
+      if (siteId && String(siteId).trim()) {
+        const key = String(siteId).trim();
+        if (!seen.has(key)) {
+          seen.add(key);
+          uniqueRows.push(row);
+        }
+      } else {
+        // Keep rows without Site ID (validation will catch this)
+        uniqueRows.push(row);
       }
     });
+
+    deduplicated[sheetName] = {
+      allRows: headers.concat(uniqueRows)
+    };
   });
 
   return deduplicated;
@@ -96,49 +169,29 @@ export const getMergeStats = (parsedFiles, mergedData) => {
     customColumns: {}
   };
 
-  const requiredTabs = ['Site Information', 'CT Capabilities', 'MRI Capabilities'];
+  const sheetNames = ['Site Information', 'CT Capabilities', 'MRI Capabilities'];
 
-  requiredTabs.forEach(tabName => {
-    stats.totalRows[tabName] = mergedData[tabName]?.length || 0;
+  sheetNames.forEach(sheetName => {
+    const schema = TEMPLATE_SCHEMA[sheetName];
+    const data = mergedData[sheetName];
+
+    if (data && data.allRows) {
+      stats.totalRows[sheetName] = data.allRows.length - schema.dataStartRow;
+    } else {
+      stats.totalRows[sheetName] = 0;
+    }
 
     // Collect custom columns
     const customCols = new Set();
     parsedFiles.forEach(file => {
-      if (file.sheets[tabName]) {
-        file.sheets[tabName].columns.forEach(col => {
-          // Check if this is a custom column by seeing if it's in standard columns
-          const standardColumns = getStandardColumnsForTab(tabName);
-          if (!standardColumns.includes(col)) {
-            customCols.add(col);
-          }
-        });
-      }
+      const extras = file.extraColumns[sheetName] || [];
+      extras.forEach(extra => {
+        customCols.add(extra.name);
+      });
     });
-    stats.customColumns[tabName] = Array.from(customCols);
+
+    stats.customColumns[sheetName] = Array.from(customCols);
   });
 
   return stats;
-};
-
-/**
- * Helper function to get standard columns for a tab
- * @param {string} tabName - Name of the tab
- * @returns {Array<string>} - Standard columns
- */
-const getStandardColumnsForTab = (tabName) => {
-  const standardColumns = {
-    'Site Information': [
-      'Site ID', 'Site Name', 'Country', 'City', 'Address',
-      'Contact Name', 'Contact Email', 'Contact Phone', 'Status'
-    ],
-    'CT Capabilities': [
-      'Site ID', 'CT Manufacturer', 'CT Model', 'Number of Slices',
-      'Installation Date', 'Last Service Date', 'Status', 'Contrast Injection Available'
-    ],
-    'MRI Capabilities': [
-      'Site ID', 'MRI Manufacturer', 'MRI Model', 'Field Strength',
-      'Installation Date', 'Last Service Date', 'Status', 'Coils Available'
-    ]
-  };
-  return standardColumns[tabName] || [];
 };

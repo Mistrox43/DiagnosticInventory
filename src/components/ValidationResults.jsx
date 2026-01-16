@@ -53,14 +53,14 @@ const ValidationResults = ({ validationResults }) => {
               <div key={index} className={`issue-item ${issue.severity}`}>
                 <div className="issue-header">
                   <span className="issue-location">
-                    {issue.tab} - Row {issue.row} - {issue.field}
+                    {issue.sheet} - Row {issue.row} - Col {issue.column} - {issue.field}
                   </span>
                   <span className={`issue-type ${issue.severity}`}>
                     {issue.severity}
                   </span>
                 </div>
                 <div className="issue-description">
-                  {issue.issue}
+                  {issue.message}
                 </div>
               </div>
             ))}
