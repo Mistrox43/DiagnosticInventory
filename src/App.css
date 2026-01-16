@@ -285,3 +285,110 @@
   font-size: 3rem;
   margin-bottom: 10px;
 }
+
+/* Validation Tabs */
+.validation-tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 25px;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+.validation-tab {
+  flex: 1;
+  padding: 15px 20px;
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 1rem;
+}
+
+.validation-tab:hover {
+  background: #f8f9ff;
+}
+
+.validation-tab.active {
+  border-bottom-color: #667eea;
+  background: #f8f9ff;
+}
+
+.validation-tab .tab-label {
+  font-weight: 600;
+  color: #333;
+  display: block;
+}
+
+.validation-tab.active .tab-label {
+  color: #667eea;
+}
+
+.validation-tab .tab-count {
+  font-size: 0.85rem;
+  color: #666;
+  display: inline-block;
+  margin-left: 5px;
+}
+
+.validation-tab .tab-breakdown {
+  display: flex;
+  gap: 8px;
+  font-size: 0.75rem;
+  margin-top: 5px;
+}
+
+.validation-tab .error-badge {
+  padding: 2px 8px;
+  background: #ffebee;
+  color: #c62828;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+.validation-tab .warning-badge {
+  padding: 2px 8px;
+  background: #fff8e1;
+  color: #f57c00;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+/* Tab Content */
+.tab-content {
+  margin-top: 20px;
+}
+
+.tab-panel {
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.tab-description {
+  background: #f0f4ff;
+  padding: 15px;
+  border-radius: 6px;
+  margin-bottom: 20px;
+  border-left: 4px solid #667eea;
+}
+
+.tab-description p {
+  margin: 0;
+  color: #555;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
