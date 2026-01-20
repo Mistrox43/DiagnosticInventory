@@ -102,6 +102,20 @@ const validateSheet = (fileName, sheetName, sheetData, extraColumns, allFiles) =
         severity: 'error',
         message: 'Missing Facility ID - this is a required field'
       });
+    } else {
+      // Validate Facility ID is numeric only
+      const facilityIdStr = String(facilityId).trim();
+      if (!/^\d+$/.test(facilityIdStr)) {
+        issues.push({
+          file: fileName,
+          sheet: sheetName,
+          row: excelRow,
+          column: getColumnLetter(0),
+          field: 'Facility ID*',
+          severity: 'error',
+          message: `Facility ID must contain only numbers. Found: "${facilityIdStr}"`
+        });
+      }
     }
 
     // If row has any data but missing Site ID, report error
@@ -116,6 +130,21 @@ const validateSheet = (fileName, sheetName, sheetData, extraColumns, allFiles) =
         message: 'Missing Site ID - this is a required field'
       });
       return; // Skip further validation if no Site ID (needed for duplicate checking)
+    } else {
+      // Validate Site ID is numeric only
+      const siteIdStr = String(siteId).trim();
+      if (!/^\d+$/.test(siteIdStr)) {
+        issues.push({
+          file: fileName,
+          sheet: sheetName,
+          row: excelRow,
+          column: getColumnLetter(1),
+          field: 'Site ID*',
+          severity: 'error',
+          message: `Site ID must contain only numbers. Found: "${siteIdStr}"`
+        });
+        return; // Skip further validation if Site ID is invalid format
+      }
     }
 
     // Check for duplicate Site ID within this file
